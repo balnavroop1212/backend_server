@@ -7,8 +7,12 @@ const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
 const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const connectDB = require('./db');
+
+// --- SAFE IMPORT FOR CLOUDINARY STORAGE ---
+const multerStorageCloudinary = require('multer-storage-cloudinary');
+// This line handles both old and new versions of the library
+const CloudinaryStorage = multerStorageCloudinary.CloudinaryStorage || multerStorageCloudinary;
 
 // Models
 const User = require('./models/User'); 
@@ -36,7 +40,7 @@ const upload = multer({ storage: storage });
 
 // 3. Middlewares
 app.use(cors()); 
-app.use(express.json({ limit: '10mb' })); // Increased limit for images
+app.use(express.json({ limit: '10mb' })); 
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // 4. Database Connection
@@ -85,7 +89,7 @@ app.post('/api/add-complaint', upload.single('image'), async (req, res) => {
     try {
         const complaintData = req.body;
 
-        // If Cloudinary successfully uploaded the file, req.file.path contains the URL
+        // req.file.path is provided by Cloudinary
         if (req.file) {
             complaintData.imageUrl = req.file.path; 
         }
@@ -123,7 +127,6 @@ app.post('/api/add-suggestion', async (req, res) => {
 
 // --- ADMIN ROUTES ---
 
-// Get all complaints for Admin overview
 app.get('/api/admin/all-complaints', async (req, res) => {
     try {
         const complaints = await Complaint.find().sort({ createdAt: -1 });
@@ -133,7 +136,6 @@ app.get('/api/admin/all-complaints', async (req, res) => {
     }
 });
 
-// Get all suggestions for Admin
 app.get('/api/admin/all-suggestions', async (req, res) => {
     try {
         const suggestions = await Suggestion.find().sort({ createdAt: -1 });
@@ -143,7 +145,6 @@ app.get('/api/admin/all-suggestions', async (req, res) => {
     }
 });
 
-// Delete a suggestion
 app.delete('/api/admin/delete-suggestion/:id', async (req, res) => {
     try {
         await Suggestion.findByIdAndDelete(req.params.id);
