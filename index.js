@@ -6,35 +6,49 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const connectDB = require('./db');
+
+// Models
 const User = require('./models/User'); 
 const Complaint = require('./models/Complaint');
 const Suggestion = require('./models/Suggestion'); 
 
-
-
 const app = express();
 
-// Middlewares
-app.use(cors()); // Allows Flutter to connect
-app.use(express.json()); // Allows server to understand JSON data
-app.get('/', (req, res) => {
-    res.send("🚀 Complaint Box API is running and connected to MongoDB!");
+// 1. Cloudinary Configuration
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
 });
-// Connect to Database
+
+// 2. Setup Cloudinary Storage for Multer
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'complaints',
+        allowed_formats: ['jpg', 'png', 'jpeg'],
+    },
+});
+const upload = multer({ storage: storage });
+
+// 3. Middlewares
+app.use(cors()); 
+app.use(express.json({ limit: '10mb' })); // Increased limit for images
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// 4. Database Connection
 connectDB();
 
 // --- ROUTES ---
-app.use('/uploads', express.static('uploads'));
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/'); // Make sure you create this folder!
-    },
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname));
-    }
+
+app.get('/', (req, res) => {
+    res.send("🚀 Complaint Box API is running and connected to MongoDB!");
 });
-const upload = multer({ storage: storage });
+
+// --- AUTHENTICATION ---
 
 app.post('/api/signup', async (req, res) => {
     try {
@@ -64,32 +78,39 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// 1. Post a new complaint (Student side)
+// --- COMPLAINTS ---
+
+// Post a new complaint with optional image upload to Cloudinary
 app.post('/api/add-complaint', upload.single('image'), async (req, res) => {
     try {
         const complaintData = req.body;
+
+        // If Cloudinary successfully uploaded the file, req.file.path contains the URL
         if (req.file) {
-            // Change 'localhost' to your IP if testing on a real phone
-            complaintData.imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+            complaintData.imageUrl = req.file.path; 
         }
 
         const newComplaint = new Complaint(complaintData);
         const savedComplaint = await newComplaint.save();
         res.status(201).json(savedComplaint);
     } catch (err) {
+        console.error("❌ Complaint Upload Error:", err);
         res.status(400).json({ message: err.message });
     }
 });
 
 // Get complaints for a specific user (History)
-app.get('/api/complaints/:userId', async (req, res) => {try {
-        const complaints = await Complaint.find({ userId: req.params.userId }).sort({ timestamp: -1 });
+app.get('/api/complaints/:userId', async (req, res) => {
+    try {
+        const complaints = await Complaint.find({ userId: req.params.userId }).sort({ createdAt: -1 });
         res.json(complaints);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
-// Post a new suggestion
+
+// --- SUGGESTIONS ---
+
 app.post('/api/add-suggestion', async (req, res) => {
     try {
         const newSuggestion = new Suggestion(req.body);
@@ -100,24 +121,28 @@ app.post('/api/add-suggestion', async (req, res) => {
     }
 });
 
+// --- ADMIN ROUTES ---
+
 // Get all complaints for Admin overview
 app.get('/api/admin/all-complaints', async (req, res) => {
     try {
-        const complaints = await Complaint.find().sort({ timestamp: -1 });
+        const complaints = await Complaint.find().sort({ createdAt: -1 });
         res.json(complaints);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
+
 // Get all suggestions for Admin
 app.get('/api/admin/all-suggestions', async (req, res) => {
     try {
-        const suggestions = await Suggestion.find().sort({ timestamp: -1 });
+        const suggestions = await Suggestion.find().sort({ createdAt: -1 });
         res.json(suggestions);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
+
 // Delete a suggestion
 app.delete('/api/admin/delete-suggestion/:id', async (req, res) => {
     try {
@@ -128,6 +153,6 @@ app.delete('/api/admin/delete-suggestion/:id', async (req, res) => {
     }
 });
 
+// 5. Start Server
 const PORT = process.env.PORT || 5000; 
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT}`));
-    
