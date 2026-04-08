@@ -40,8 +40,9 @@ const upload = multer({ storage: storage });
 
 // 3. Middlewares
 app.use(cors()); 
-app.use(express.json({ limit: '10mb' })); 
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+    
 
 // 4. Database Connection
 connectDB();
@@ -85,21 +86,35 @@ app.post('/api/login', async (req, res) => {
 // --- COMPLAINTS ---
 
 // Post a new complaint with optional image upload to Cloudinary
-app.post('/api/add-complaint', upload.single('image'), async (req, res) => {
+app.post('/api/add-complaint', (req, res, next) => {
+    // 1. Manually trigger multer to catch errors BEFORE they cause a 502
+    upload.single('image')(req, res, (err) => {
+        if (err instanceof multer.MulterError) {
+            console.error("❌ Multer Error:", err.message);
+            return res.status(400).json({ message: "File upload error", error: err.message });
+        } else if (err) {
+            console.error("❌ Cloudinary/Server Error:", err);
+            return res.status(500).json({ message: "Cloudinary connection failed", error: err.message });
+        }
+        // No error? Move to the next function
+        next();
+    });
+}, async (req, res) => {
     try {
         const complaintData = req.body;
-
-        // req.file.path is provided by Cloudinary
+        
+        // Cloudinary provides the URL in req.file.path
         if (req.file) {
+            console.log("📸 Image uploaded to Cloudinary:", req.file.path);
             complaintData.imageUrl = req.file.path; 
         }
 
         const newComplaint = new Complaint(complaintData);
-        const savedComplaint = await newComplaint.save();
-        res.status(201).json(savedComplaint);
+        await newComplaint.save();
+        res.status(201).json(newComplaint);
     } catch (err) {
-        console.error("❌ Complaint Upload Error:", err);
-        res.status(400).json({ message: err.message });
+        console.error("❌ Database Error:", err);
+        res.status(500).json({ message: "Failed to save complaint to database", error: err.message });
     }
 });
 
