@@ -7,10 +7,10 @@ const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
 const cloudinary = require('cloudinary').v2;
+const multerStorageCloudinary = require('multer-storage-cloudinary');
+
 const connectDB = require('./db');
 
-// --- SAFE IMPORT FOR CLOUDINARY STORAGE ---
-const multerStorageCloudinary = require('multer-storage-cloudinary');
 // This line handles both old and new versions of the library
 const CloudinaryStorage = multerStorageCloudinary.CloudinaryStorage || multerStorageCloudinary;
 
@@ -28,7 +28,6 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// 2. Setup Cloudinary Storage for Multer
 const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
@@ -36,6 +35,7 @@ const storage = new CloudinaryStorage({
         allowed_formats: ['jpg', 'png', 'jpeg'],
     },
 });
+
 const upload = multer({ storage: storage });
 
 // 3. Middlewares
