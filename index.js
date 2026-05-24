@@ -57,11 +57,17 @@ app.get('/', (req, res) => {
 
 app.post('/api/signup', async (req, res) => {
     try {
-        const { name, rollNumber, password } = req.body;
+        const { name, rollNumber, password, phone } = req.body;
+        
+        // Validate phone number (Indian format: 10 digits starting with 6-9)
+        if (!phone || !/^[6-9][0-9]{9}$/.test(phone)) {
+            return res.status(400).json({ message: "Invalid phone number. Must be 10 digits starting with 6-9" });
+        }
+        
         const existingUser = await User.findOne({ rollNumber });
         if (existingUser) return res.status(400).json({ message: "User already exists" });
 
-        const newUser = new User({ name, rollNumber, password });
+        const newUser = new User({ name, rollNumber, password, phone });
         await newUser.save();
         res.status(201).json({ message: "User created" });
     } catch (err) {
@@ -145,7 +151,20 @@ app.post('/api/add-suggestion', async (req, res) => {
 app.get('/api/admin/all-complaints', async (req, res) => {
     try {
         const complaints = await Complaint.find().sort({ createdAt: -1 });
-        res.json(complaints);
+        
+        // Enrich complaints with user phone numbers
+        const enrichedComplaints = await Promise.all(
+            complaints.map(async (complaint) => {
+                const user = await User.findOne({ rollNumber: complaint.userId }).select('name phone');
+                return {
+                    ...complaint.toObject(),
+                    userPhone: user?.phone || 'N/A',
+                    userName: user?.name || 'Unknown'
+                };
+            })
+        );
+        
+        res.json(enrichedComplaints);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
