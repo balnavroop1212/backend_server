@@ -57,19 +57,19 @@ app.get('/', (req, res) => {
 
 app.post('/api/signup', async (req, res) => {
     try {
-        const { name, rollNumber, password, phone } = req.body;
+        const { name, userId, password, phone } = req.body;
         
         // Validate phone number (Indian format: 10 digits starting with 6-9)
         if (!phone || !/^[6-9][0-9]{9}$/.test(phone)) {
             return res.status(400).json({ message: "Invalid phone number. Must be 10 digits starting with 6-9" });
         }
         
-        const existingUser = await User.findOne({ rollNumber });
-        if (existingUser) return res.status(400).json({ message: "User already exists" });
+        const existingUser = await User.findOne({ userId });
+        if (existingUser) return res.status(400).json({ message: "User ID already exists" });
 
-        const newUser = new User({ name, rollNumber, password, phone });
+        const newUser = new User({ name, userId, password, phone });
         await newUser.save();
-        res.status(201).json({ message: "User created" });
+        res.status(201).json({ message: "User created successfully" });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -77,12 +77,12 @@ app.post('/api/signup', async (req, res) => {
 
 app.post('/api/login', async (req, res) => {
     try {
-        const { rollNumber, password } = req.body;
-        const user = await User.findOne({ rollNumber, password });
+        const { userId, password } = req.body;
+        const user = await User.findOne({ userId, password });
         if (user) {
             res.status(200).json(user);
         } else {
-            res.status(401).json({ message: "Invalid credentials" });
+            res.status(401).json({ message: "Invalid User ID or password" });
         }
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -155,7 +155,7 @@ app.get('/api/admin/all-complaints', async (req, res) => {
         // Enrich complaints with user phone numbers
         const enrichedComplaints = await Promise.all(
             complaints.map(async (complaint) => {
-                const user = await User.findOne({ rollNumber: complaint.userId }).select('name phone');
+                const user = await User.findOne({ userId: complaint.userId }).select('name phone');
                 return {
                     ...complaint.toObject(),
                     userPhone: user?.phone || 'N/A',
