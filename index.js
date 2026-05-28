@@ -57,7 +57,7 @@ app.get('/', (req, res) => {
 
 app.post('/api/signup', async (req, res) => {
     try {
-        const { name, userId, password, phone } = req.body;
+        const { name, userId, password, phone, role } = req.body;
         
         // Validate phone number (Indian format: 10 digits starting with 6-9)
         if (!phone || !/^[6-9][0-9]{9}$/.test(phone)) {
@@ -67,7 +67,7 @@ app.post('/api/signup', async (req, res) => {
         const existingUser = await User.findOne({ userId });
         if (existingUser) return res.status(400).json({ message: "User ID already exists" });
 
-        const newUser = new User({ name, userId, password, phone });
+        const newUser = new User({ name, userId, password, phone, role: role || 'user' });
         await newUser.save();
         res.status(201).json({ message: "User created successfully" });
     } catch (err) {
@@ -179,12 +179,39 @@ app.get('/api/admin/all-suggestions', async (req, res) => {
     }
 });
 
+app.get('/api/admin/workers', async (req, res) => {
+    try {
+        // Fetch users where role is NOT 'user' and NOT 'admin'
+        const workers = await User.find({
+            role: { $in: ['Electricity', 'Plumber', 'Carpenter', 'Dispensary'] }
+        });
+        res.status(200).json(workers);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 app.delete('/api/admin/delete-suggestion/:id', async (req, res) => {
     try {
         await Suggestion.findByIdAndDelete(req.params.id);
         res.json({ message: "Suggestion deleted" });
     } catch (err) {
         res.status(500).json({ message: err.message });
+    }
+});
+
+app.delete('/api/admin/delete-user/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const deletedUser = await User.findOneAndDelete({ userId: userId });
+        
+        if (!deletedUser) {
+            return res.status(404).json({ message: "Worker not found" });
+        }
+        
+        res.status(200).json({ message: "Worker deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 });
 

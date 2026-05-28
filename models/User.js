@@ -5,6 +5,7 @@ const UserSchema = new mongoose.Schema({
     userId: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     phone: { type: String, required: true },
+    role: { type: String, default: 'user' }, // This stores 'Electricity', 'Plumber', etc.
     createdAt: { type: Date, default: Date.now }
 });
 
