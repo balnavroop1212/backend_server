@@ -120,7 +120,23 @@ app.post('/api/add-complaint', (req, res, next) => {
             complaintData.imageUrl = req.file.path; 
         }
 
-        const newComplaint = new Complaint(complaintData);
+        const { userId, category, subCategory, description } = complaintData;
+
+        // 1. Fetch user to get their phone number
+        const user = await User.findOne({ userId });
+
+        // 2. Create complaint with phone number included
+        const newComplaint = new Complaint({
+            userId,
+            phone: user ? user.phone : 'N/A', // Store phone number here
+            category,
+            subCategory,
+            description,
+            status: 'Pending',
+            createdAt: new Date(),
+            imageUrl: complaintData.imageUrl // Include imageUrl if present
+        });
+
         await newComplaint.save();
         res.status(201).json(newComplaint);
     } catch (err) {
@@ -157,19 +173,7 @@ app.get('/api/admin/all-complaints', async (req, res) => {
     try {
         const complaints = await Complaint.find().sort({ createdAt: -1 });
         
-        // Enrich complaints with user phone numbers
-        const enrichedComplaints = await Promise.all(
-            complaints.map(async (complaint) => {
-                const user = await User.findOne({ userId: complaint.userId }).select('name phone');
-                return {
-                    ...complaint.toObject(),
-                    userPhone: user?.phone || 'N/A',
-                    userName: user?.name || 'Unknown'
-                };
-            })
-        );
-        
-        res.json(enrichedComplaints);
+        res.json(complaints);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
