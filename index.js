@@ -80,7 +80,12 @@ app.post('/api/login', async (req, res) => {
         const { userId, password } = req.body;
         const user = await User.findOne({ userId, password });
         if (user) {
-            res.status(200).json(user);
+            res.status(200).json({
+                message: "Login successful",
+                userId: user.userId,
+                name: user.name,
+                role: user.role
+            });
         } else {
             res.status(401).json({ message: "Invalid User ID or password" });
         }
@@ -181,10 +186,11 @@ app.get('/api/admin/all-suggestions', async (req, res) => {
 
 app.get('/api/admin/workers', async (req, res) => {
     try {
-        // Fetch users where role is NOT 'user' and NOT 'admin'
-        const workers = await User.find({
-            role: { $in: ['Electricity', 'Plumber', 'Carpenter', 'Dispensary'] }
-        });
+        // Return only worker roles; exclude regular users and admins
+        const workers = await User.find(
+            { role: { $nin: ['user', 'admin'] } },
+            'name userId role phone'
+        );
         res.status(200).json(workers);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -206,10 +212,10 @@ app.delete('/api/admin/delete-user/:userId', async (req, res) => {
         const deletedUser = await User.findOneAndDelete({ userId: userId });
         
         if (!deletedUser) {
-            return res.status(404).json({ message: "Worker not found" });
+            return res.status(404).json({ message: "User not found" });
         }
         
-        res.status(200).json({ message: "Worker deleted successfully" });
+        res.status(200).json({ message: "User deleted successfully" });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
