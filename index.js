@@ -227,17 +227,17 @@ app.post('/api/admin/assign-complaint', async (req, res) => {
   try {
     const { complaintId, workerRole } = req.body;
     
+    // Assign the department and keep status as 'Pending'
     const updatedComplaint = await Complaint.findByIdAndUpdate(
       complaintId,
-      { workerRole: workerRole }, // Assign the department (e.g., 'Electricity')
+      { workerRole: workerRole }, 
       { new: true }
     );
 
     if (!updatedComplaint) return res.status(404).json({ message: "Complaint not found" });
-    
-    res.status(200).json({ message: "Complaint assigned successfully" });
+    res.status(200).json({ message: "Assigned successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Error assigning complaint" });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
