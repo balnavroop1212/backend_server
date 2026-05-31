@@ -56,43 +56,46 @@ app.get('/', (req, res) => {
 // --- AUTHENTICATION ---
 
 app.post('/api/signup', async (req, res) => {
-    try {
-        const { name, userId, password, phone, role } = req.body;
-        
-        // Validate phone number (Indian format: 10 digits starting with 6-9)
-        if (!phone || !/^[6-9][0-9]{9}$/.test(phone)) {
-            return res.status(400).json({ message: "Invalid phone number. Must be 10 digits starting with 6-9" });
-        }
-        
-        const existingUser = await User.findOne({ userId });
-        if (existingUser) return res.status(400).json({ message: "User ID already exists" });
+  const { name, userId, password, phone, role } = req.body;
 
-        const newUser = new User({ name, userId, password, phone, role: role || 'user' });
-        await newUser.save();
-        res.status(201).json({ message: "User created successfully" });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
+  try {
+    const newUser = new User({
+      name,
+      userId,
+      password, // Remember to hash this!
+      phone,
+      role: role || 'user' // Default to 'user' if no role provided
+    });
+
+    await newUser.save();
+    res.status(201).json({ message: "User created successfully" });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
 });
 
 app.post('/api/login', async (req, res) => {
-    try {
-        const { userId, password } = req.body;
-        const user = await User.findOne({ userId, password });
-        if (user) {
-            res.status(200).json({
-                message: "Login successful",
-                userId: user.userId,
-                name: user.name,
-                role: user.role,
-                phone: user.phone // Ensure phone is included in the login response
-            });
-        } else {
-            res.status(401).json({ message: "Invalid User ID or password" });
-        }
-    } catch (err) {
-        res.status(500).json({ message: err.message });
+  const { userId, password } = req.body;
+
+  try {
+    const user = await User.findOne({ userId });
+    if (!user) return res.status(401).json({ message: "Invalid User ID" });
+
+    // Note: Use bcrypt.compare if passwords are hashed (recommended)
+    if (user.password !== password) {
+      return res.status(401).json({ message: "Invalid password" });
     }
+
+    // Return all fields expected by the Flutter login_page.dart
+    res.status(200).json({
+      userId: user.userId,
+      name: user.name,
+      role: user.role,
+      phone: user.phone
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 // --- COMPLAINTS ---
