@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const ComplaintSchema = new mongoose.Schema({
     userId: { type: String, required: true }, // This is the Student Roll Number
+    phone: { type: String }, // Add this field
     category: { type: String, required: true },
     subCategory: { type: String },
     description: { type: String, required: true },

@@ -84,7 +84,8 @@ app.post('/api/login', async (req, res) => {
                 message: "Login successful",
                 userId: user.userId,
                 name: user.name,
-                role: user.role
+                role: user.role,
+                phone: user.phone // Ensure phone is included in the login response
             });
         } else {
             res.status(401).json({ message: "Invalid User ID or password" });
@@ -120,19 +121,16 @@ app.post('/api/add-complaint', (req, res, next) => {
             complaintData.imageUrl = req.file.path; 
         }
 
-        const { userId, category, subCategory, description } = complaintData;
+        const { userId, category, subCategory, description, phone, status } = complaintData;
 
-        // 1. Fetch user to get their phone number
-        const user = await User.findOne({ userId });
-
-        // 2. Create complaint with phone number included
+        // 2. Create complaint with phone number included directly from the request
         const newComplaint = new Complaint({
             userId,
-            phone: user ? user.phone : 'N/A', // Store phone number here
+            phone: phone || 'N/A', // Store phone number sent by the app
             category,
             subCategory,
             description,
-            status: 'Pending',
+            status: status || 'Pending',
             createdAt: new Date(),
             imageUrl: complaintData.imageUrl // Include imageUrl if present
         });
