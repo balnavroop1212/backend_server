@@ -223,6 +223,52 @@ app.delete('/api/admin/delete-user/:userId', async (req, res) => {
     }
 });
 
+// Assign a complaint to a worker
+app.post('/api/admin/assign-complaint', async (req, res) => {
+    try {
+        const { complaintId, workerRole } = req.body;
+
+        if (!complaintId || !workerRole) {
+            return res.status(400).json({ message: "Complaint ID and Worker Role are required" });
+        }
+
+        const updatedComplaint = await Complaint.findByIdAndUpdate(
+            complaintId,
+            { $set: { workerRole: workerRole, status: 'Assigned' } }, // Set status to 'Assigned'
+            { new: true }
+        );
+
+        if (!updatedComplaint) {
+            return res.status(404).json({ message: "Complaint not found" });
+        }
+
+        res.status(200).json({ message: "Complaint assigned successfully", complaint: updatedComplaint });
+    } catch (err) {
+        console.error("❌ Error assigning complaint:", err);
+        res.status(500).json({ message: "Error assigning complaint", error: err.message });
+    }
+});
+
+// --- WORKER ROUTES ---
+
+// Get complaints for a specific worker role
+app.get('/api/worker/complaints/:workerRole', async (req, res) => {
+    try {
+        const { workerRole } = req.params;
+
+        // Filter complaints by workerRole and status (e.g., 'Assigned', 'In Progress')
+        const complaints = await Complaint.find({
+            workerRole: workerRole,
+            status: { $in: ['Assigned', 'In Progress'] } // Only show relevant statuses for workers
+        }).sort({ createdAt: -1 });
+
+        res.status(200).json(complaints);
+    } catch (err) {
+        console.error("❌ Error fetching worker complaints:", err);
+        res.status(500).json({ message: "Error fetching worker complaints", error: err.message });
+    }
+});
+
 // 5. Start Server
 const PORT = process.env.PORT || 5000; 
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT}`));
