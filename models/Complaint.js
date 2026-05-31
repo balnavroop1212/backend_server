@@ -8,7 +8,7 @@ const ComplaintSchema = new mongoose.Schema({
     description: { type: String, required: true },
     imageUrl: { type: String }, // For the image link
     status: { type: String, default: "Pending" },
-    workerRole: { type: String }, // Add this field for assigning to workers
+    workerRole: { type: String, default: '' }, // Add this field for assigning to workers
     createdAt: { type: Date, default: Date.now }
 });
 

@@ -223,78 +223,56 @@ app.delete('/api/admin/delete-user/:userId', async (req, res) => {
     }
 });
 
-// Assign a complaint to a worker
 app.post('/api/admin/assign-complaint', async (req, res) => {
-    try {
-        const { complaintId, workerRole } = req.body;
+  try {
+    const { complaintId, workerRole } = req.body;
+    
+    const updatedComplaint = await Complaint.findByIdAndUpdate(
+      complaintId,
+      { workerRole: workerRole }, // Assign the department (e.g., 'Electricity')
+      { new: true }
+    );
 
-        if (!complaintId || !workerRole) {
-            return res.status(400).json({ message: "Complaint ID and Worker Role are required" });
-        }
-
-        const updatedComplaint = await Complaint.findByIdAndUpdate(
-            complaintId,
-            { $set: { workerRole: workerRole, status: 'Assigned' } }, // Set status to 'Assigned'
-            { new: true }
-        );
-
-        if (!updatedComplaint) {
-            return res.status(404).json({ message: "Complaint not found" });
-        }
-
-        res.status(200).json({ message: "Complaint assigned successfully", complaint: updatedComplaint });
-    } catch (err) {
-        console.error("❌ Error assigning complaint:", err);
-        res.status(500).json({ message: "Error assigning complaint", error: err.message });
-    }
+    if (!updatedComplaint) return res.status(404).json({ message: "Complaint not found" });
+    
+    res.status(200).json({ message: "Complaint assigned successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error assigning complaint" });
+  }
 });
 
 // --- WORKER ROUTES ---
 
 // Get complaints for a specific worker role
 app.get('/api/worker/complaints/:workerRole', async (req, res) => {
-    try {
-        const { workerRole } = req.params;
-
-        // Filter complaints by workerRole and status (e.g., 'Assigned', 'In Progress')
-        const complaints = await Complaint.find({
-            workerRole: workerRole,
-            status: { $in: ['Assigned', 'In Progress'] } // Only show relevant statuses for workers
-        }).sort({ createdAt: -1 });
-
-        res.status(200).json(complaints);
-    } catch (err) {
-        console.error("❌ Error fetching worker complaints:", err);
-        res.status(500).json({ message: "Error fetching worker complaints", error: err.message });
-    }
+  try {
+    const { workerRole } = req.params;
+    // Find complaints where workerRole matches the department
+    const complaints = await Complaint.find({ workerRole: workerRole }).sort({ createdAt: -1 });
+    res.status(200).json(complaints);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching worker tasks" });
+  }
 });
 
-// Update complaint status
 app.post('/api/complaints/update-status', async (req, res) => {
-    try {
-        const { complaintId, status } = req.body;
+  try {
+    const { complaintId, status } = req.body;
+    
+    const updatedComplaint = await Complaint.findByIdAndUpdate(
+      complaintId,
+      { status: status }, // e.g., 'In Progress' or 'Resolved'
+      { new: true }
+    );
 
-        if (!complaintId || !status) {
-            return res.status(400).json({ message: "Complaint ID and Status are required" });
-        }
-
-        const updatedComplaint = await Complaint.findByIdAndUpdate(
-            complaintId,
-            { $set: { status: status } },
-            { new: true }
-        );
-
-        if (!updatedComplaint) {
-            return res.status(404).json({ message: "Complaint not found" });
-        }
-
-        res.status(200).json({ message: "Complaint status updated successfully", complaint: updatedComplaint });
-    } catch (err) {
-        console.error("❌ Error updating complaint status:", err);
-        res.status(500).json({ message: "Error updating complaint status", error: err.message });
-    }
+    if (!updatedComplaint) return res.status(404).json({ message: "Complaint not found" });
+    
+    res.status(200).json({ message: "Status updated successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating status" });
+  }
 });
 
 // 5. Start Server
 const PORT = process.env.PORT || 5000; 
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT}`));�� Server running on port ${PORT}`));
