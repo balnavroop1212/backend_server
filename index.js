@@ -137,7 +137,7 @@ app.post('/api/login', async (req, res) => {
 // --- COMPLAINTS ---
 
 // Post a new complaint with optional image upload to Cloudinary
-app.post('/api/add-complaint', authenticateToken, (req, res, next) => {
+app.post('/api/add-complaint', (req, res, next) => {
     // 1. Manually trigger multer to catch errors BEFORE they cause a 502
     upload.single('image')(req, res, (err) => {
         if (err instanceof multer.MulterError) {
@@ -183,7 +183,7 @@ app.post('/api/add-complaint', authenticateToken, (req, res, next) => {
 });
 
 // Get complaints for a specific user (History)
-app.get('/api/complaints/:userId', authenticateToken, async (req, res) => {
+app.get('/api/complaints/:userId', async (req, res) => {
     try {
         const complaints = await Complaint.find({ userId: req.params.userId }).sort({ createdAt: -1 });
         res.json(complaints);
@@ -194,7 +194,7 @@ app.get('/api/complaints/:userId', authenticateToken, async (req, res) => {
 
 // --- SUGGESTIONS ---
 
-app.post('/api/add-suggestion', authenticateToken, async (req, res) => {
+app.post('/api/add-suggestion', async (req, res) => {
     try {
         const newSuggestion = new Suggestion(req.body);
         await newSuggestion.save();
