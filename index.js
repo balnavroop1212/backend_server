@@ -8,6 +8,10 @@ const path = require('path');
 const cors = require('cors');
 const cloudinary = require('cloudinary').v2;
 const multerStorageCloudinary = require('multer-storage-cloudinary');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey';
 
 const connectDB = require('./db');
 
@@ -20,6 +24,20 @@ const Complaint = require('./models/Complaint');
 const Suggestion = require('./models/Suggestion'); 
 
 const app = express();
+
+// Middleware to protect routes
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token == null) return res.sendStatus(401); // No token provided
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403); // Invalid token
+    req.user = user;
+    next();
+  });
+};
 
 // 1. Cloudinary Configuration
 cloudinary.config({
@@ -58,13 +76,20 @@ app.get('/', (req, res) => {
 app.post('/api/signup', async (req, res) => {
   const { name, userId, password, phone, role } = req.body;
 
+  if (!name || !userId || !password || !phone) {
+    return res.status(400).json({ message: "Name, user ID, password, and phone are required" });
+  }
+
   try {
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
     const newUser = new User({
       name,
       userId,
-      password, // Remember to hash this!
+      password: hashedPassword,
       phone,
-      role: role || 'user' // Default to 'user' if no role provided
+      role: role || 'user'
     });
 
     await newUser.save();
@@ -77,17 +102,28 @@ app.post('/api/signup', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   const { userId, password } = req.body;
 
+  if (!userId || !password) {
+    return res.status(400).json({ message: "User ID and password are required" });
+  }
+
   try {
     const user = await User.findOne({ userId });
-    if (!user) return res.status(401).json({ message: "Invalid User ID" });
+    if (!user) return res.status(401).json({ message: "Invalid User ID or Password" });
 
-    // Note: Use bcrypt.compare if passwords are hashed (recommended)
-    if (user.password !== password) {
-      return res.status(401).json({ message: "Invalid password" });
+    let isMatch = await bcrypt.compare(password, user.password).catch(() => false);
+    if (!isMatch && user.password === password) {
+      user.password = await bcrypt.hash(password, 10);
+      await user.save();
+      isMatch = true;
+    }
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid User ID or Password" });
     }
 
-    // Return all fields expected by the Flutter login_page.dart
+    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+
     res.status(200).json({
+      token,
       userId: user.userId,
       name: user.name,
       role: user.role,
@@ -101,7 +137,7 @@ app.post('/api/login', async (req, res) => {
 // --- COMPLAINTS ---
 
 // Post a new complaint with optional image upload to Cloudinary
-app.post('/api/add-complaint', (req, res, next) => {
+app.post('/api/add-complaint', authenticateToken, (req, res, next) => {
     // 1. Manually trigger multer to catch errors BEFORE they cause a 502
     upload.single('image')(req, res, (err) => {
         if (err instanceof multer.MulterError) {
@@ -147,7 +183,7 @@ app.post('/api/add-complaint', (req, res, next) => {
 });
 
 // Get complaints for a specific user (History)
-app.get('/api/complaints/:userId', async (req, res) => {
+app.get('/api/complaints/:userId', authenticateToken, async (req, res) => {
     try {
         const complaints = await Complaint.find({ userId: req.params.userId }).sort({ createdAt: -1 });
         res.json(complaints);
@@ -158,7 +194,7 @@ app.get('/api/complaints/:userId', async (req, res) => {
 
 // --- SUGGESTIONS ---
 
-app.post('/api/add-suggestion', async (req, res) => {
+app.post('/api/add-suggestion', authenticateToken, async (req, res) => {
     try {
         const newSuggestion = new Suggestion(req.body);
         await newSuggestion.save();

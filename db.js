@@ -1,4 +1,3 @@
-console.log("My Connection String is:", process.env.MONGO_URI);
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
