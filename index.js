@@ -134,6 +134,45 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// Change Password Route
+app.post('/api/change-password', async (req, res) => {
+    const { userId, oldPassword, newPassword } = req.body;
+
+    if (!userId || !oldPassword || !newPassword) {
+        return res.status(400).json({ message: "userId, oldPassword, and newPassword are required" });
+    }
+
+    try {
+        // 1. Find the user (or admin/worker) by userId
+        const user = await User.findOne({ userId: userId });
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // 2. Check if the old password matches using bcrypt, fallback to plain text if unhashed
+        let isMatch = await bcrypt.compare(oldPassword, user.password).catch(() => false);
+        if (!isMatch && oldPassword === user.password) {
+            isMatch = true;
+        }
+
+        if (!isMatch) {
+            return res.status(400).json({ message: "Incorrect current password" });
+        }
+
+        // 3. Hash and update to the new password
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        
+        await user.save();
+
+        res.status(200).json({ message: "Password updated successfully" });
+    } catch (error) {
+        console.error("Change Password Error:", error);
+        res.status(500).json({ message: "Server error occurred" });
+    }
+});
+
 // --- COMPLAINTS ---
 
 // Post a new complaint with optional image upload to Cloudinary
