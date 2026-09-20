@@ -22,6 +22,7 @@ const CloudinaryStorage = multerStorageCloudinary.CloudinaryStorage || multerSto
 const User = require('./models/User'); 
 const Complaint = require('./models/Complaint');
 const Suggestion = require('./models/Suggestion'); 
+const Notification = require('./models/Notification'); 
 
 const app = express();
 
@@ -214,6 +215,23 @@ app.post('/api/add-complaint', (req, res, next) => {
         });
 
         await newComplaint.save();
+
+        // Create notifications for admin and user
+        await Notification.insertMany([
+            {
+                recipientId: 'admin',
+                title: 'New Complaint Received',
+                message: `New complaint registered in ${category}`,
+                type: 'new_complaint'
+            },
+            {
+                recipientId: userId,
+                title: 'Complaint Registered',
+                message: 'Your complaint has been successfully registered',
+                type: 'complaint_status'
+            }
+        ]);
+
         res.status(201).json(newComplaint);
     } catch (err) {
         console.error("❌ Database Error:", err);
@@ -345,10 +363,42 @@ app.post('/api/complaints/update-status', async (req, res) => {
 
     if (!updatedComplaint) return res.status(404).json({ message: "Complaint not found" });
     
+    // Create notification for user when complaint status is updated
+    await Notification.create({
+      recipientId: updatedComplaint.userId,
+      title: 'Complaint Status Updated',
+      message: `Your complaint status updated to: ${status}`,
+      type: 'complaint_status'
+    });
+
     res.status(200).json({ message: "Status updated successfully" });
   } catch (err) {
     res.status(500).json({ message: "Error updating status" });
   }
+});
+
+// --- NOTIFICATIONS ---
+
+// Get notifications for a user or admin
+app.get('/api/notifications/:userId', async (req, res) => {
+    try {
+        const notifications = await Notification.find({ recipientId: req.params.userId })
+            .sort({ createdAt: -1 })
+            .limit(20);
+        res.json(notifications);
+    } catch (err) {
+        res.status(500).send(err);
+    }
+});
+
+// Mark notifications as read
+app.post('/api/notifications/mark-read', async (req, res) => {
+    try {
+        await Notification.updateMany({ recipientId: req.body.userId, isRead: false }, { isRead: true });
+        res.sendStatus(200);
+    } catch (err) {
+        res.status(500).send(err);
+    }
 });
 
 // 5. Start Server
