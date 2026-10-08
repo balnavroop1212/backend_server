@@ -208,6 +208,24 @@ app.post('/api/change-password', async (req, res) => {
     }
 });
 
+const mapCategoryToWorkerRole = (category) => {
+    switch (category) {
+        case 'Electricity':
+            return 'Electricity';
+        case 'Plumber':
+            return 'Plumbing';
+        case 'Carpenter':
+            return 'Carpenter';
+        case 'Dispensary':
+            return 'Dispensary';
+        case 'Connectivity':
+        case 'Labs':
+            return 'Technician';
+        default:
+            return 'Miscellaneous';
+    }
+};
+
 // --- COMPLAINTS ---
 
 // Post a new complaint with optional image upload to Cloudinary
@@ -442,3 +460,4 @@ app.post('/api/notifications/mark-read', async (req, res) => {
 // 5. Start Server
 const PORT = process.env.PORT || 5000; 
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT}`));
+
