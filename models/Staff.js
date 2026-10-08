@@ -1,16 +1,19 @@
 const mongoose = require('mongoose');
 
-const UserSchema = new mongoose.Schema({
+const StaffSchema = new mongoose.Schema({
     name: { type: String, required: true },
     userId: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     phone: { type: String, required: true },
     role: {
         type: String,
-        default: 'user',
-        enum: ['user']
+        required: true,
+        enum: ['admin', 'Electricity', 'Plumbing', 'Carpenter', 'Dispensary', 'Miscellaneous']
     },
     createdAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('User', UserSchema);
+// Index for performant querying by role
+StaffSchema.index({ role: 1 });
+
+module.exports = mongoose.model('Staff', StaffSchema, 'staff');

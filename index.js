@@ -20,6 +20,7 @@ const CloudinaryStorage = multerStorageCloudinary.CloudinaryStorage || multerSto
 
 // Models
 const User = require('./models/User'); 
+const Staff = require('./models/Staff');
 const Complaint = require('./models/Complaint');
 const Suggestion = require('./models/Suggestion'); 
 const Notification = require('./models/Notification'); 
@@ -82,19 +83,38 @@ app.post('/api/signup', async (req, res) => {
   }
 
   try {
+    // Check uniqueness across both User and Staff collections
+    const existingUser = await User.findOne({ userId }).lean();
+    const existingStaff = await Staff.findOne({ userId }).lean();
+    if (existingUser || existingStaff) {
+      return res.status(400).json({ message: "User ID already exists" });
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const newUser = new User({
-      name,
-      userId,
-      password: hashedPassword,
-      phone,
-      role: role || 'user'
-    });
-
-    await newUser.save();
-    res.status(201).json({ message: "User created successfully" });
+    const staffRoles = ['admin', 'Electricity', 'Plumbing', 'Carpenter', 'Dispensary', 'Miscellaneous'];
+    if (role && staffRoles.includes(role)) {
+      const newStaff = new Staff({
+        name,
+        userId,
+        password: hashedPassword,
+        phone,
+        role
+      });
+      await newStaff.save();
+      return res.status(201).json({ message: "Staff created successfully" });
+    } else {
+      const newUser = new User({
+        name,
+        userId,
+        password: hashedPassword,
+        phone,
+        role: 'user'
+      });
+      await newUser.save();
+      return res.status(201).json({ message: "User created successfully" });
+    }
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
@@ -108,20 +128,31 @@ app.post('/api/login', async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ userId });
+    let user = await User.findOne({ userId }).lean();
+    let isStaff = false;
+
+    if (!user) {
+      user = await Staff.findOne({ userId }).lean();
+      isStaff = true;
+    }
+
     if (!user) return res.status(401).json({ message: "Invalid User ID or Password" });
 
     let isMatch = await bcrypt.compare(password, user.password).catch(() => false);
     if (!isMatch && user.password === password) {
-      user.password = await bcrypt.hash(password, 10);
-      await user.save();
+      const newHashedPassword = await bcrypt.hash(password, 10);
+      if (isStaff) {
+        await Staff.updateOne({ _id: user._id }, { password: newHashedPassword });
+      } else {
+        await User.updateOne({ _id: user._id }, { password: newHashedPassword });
+      }
       isMatch = true;
     }
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid User ID or Password" });
     }
 
-    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user._id, role: user.role, userId: user.userId }, JWT_SECRET, { expiresIn: '1h' });
 
     res.status(200).json({
       token,
@@ -144,16 +175,19 @@ app.post('/api/change-password', async (req, res) => {
     }
 
     try {
-        // 1. Find the user (or admin/worker) by userId
-        const user = await User.findOne({ userId: userId });
+        // 1. Locate account by userId across User and Staff collections
+        let account = await User.findOne({ userId: userId });
+        if (!account) {
+            account = await Staff.findOne({ userId: userId });
+        }
 
-        if (!user) {
+        if (!account) {
             return res.status(404).json({ message: "User not found" });
         }
 
-        // 2. Check if the old password matches using bcrypt, fallback to plain text if unhashed
-        let isMatch = await bcrypt.compare(oldPassword, user.password).catch(() => false);
-        if (!isMatch && oldPassword === user.password) {
+        // 2. Check if old password matches
+        let isMatch = await bcrypt.compare(oldPassword, account.password).catch(() => false);
+        if (!isMatch && oldPassword === account.password) {
             isMatch = true;
         }
 
@@ -163,9 +197,9 @@ app.post('/api/change-password', async (req, res) => {
 
         // 3. Hash and update to the new password
         const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(newPassword, salt);
+        account.password = await bcrypt.hash(newPassword, salt);
         
-        await user.save();
+        await account.save();
 
         res.status(200).json({ message: "Password updated successfully" });
     } catch (error) {
@@ -284,11 +318,11 @@ app.get('/api/admin/all-suggestions', async (req, res) => {
 
 app.get('/api/admin/workers', async (req, res) => {
     try {
-        // Return only worker roles; exclude regular users and admins
-        const workers = await User.find(
-            { role: { $nin: ['user', 'admin'] } },
+        // Query Staff directly for worker roles excluding admins using .lean()
+        const workers = await Staff.find(
+            { role: { $ne: 'admin' } },
             'name userId role phone'
-        );
+        ).lean();
         res.status(200).json(workers);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -307,8 +341,12 @@ app.delete('/api/admin/delete-suggestion/:id', async (req, res) => {
 app.delete('/api/admin/delete-user/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
-        const deletedUser = await User.findOneAndDelete({ userId: userId });
+        let deletedUser = await User.findOneAndDelete({ userId: userId });
         
+        if (!deletedUser) {
+            deletedUser = await Staff.findOneAndDelete({ userId: userId });
+        }
+
         if (!deletedUser) {
             return res.status(404).json({ message: "User not found" });
         }
