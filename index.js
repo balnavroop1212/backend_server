@@ -93,7 +93,7 @@ app.post('/api/signup', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const staffRoles = ['admin', 'Electricity', 'Plumbing', 'Carpenter', 'Dispensary', 'Miscellaneous'];
+    const staffRoles = ['admin', 'Electricity', 'Plumbing', 'Carpenter', 'Dispensary', 'Miscellaneous', 'Technician'];
     if (role && staffRoles.includes(role)) {
       const newStaff = new Staff({
         name,
@@ -382,7 +382,66 @@ app.get('/api/worker/complaints/:workerRole', async (req, res) => {
   try {
     const { workerRole } = req.params;
     // Find complaints where workerRole matches the department
-    const complaints = await Complaint.find({ workerRole: workerRole }).sort({ createdAt: -1 });
+    const complaints = await Complaint.find({ workerRole: new RegExp('^' + workerRole + '
+    res.status(200).json(complaints);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching worker tasks" });
+  }
+});
+
+app.post('/api/complaints/update-status', async (req, res) => {
+  try {
+    const { complaintId, status } = req.body;
+    
+    const updatedComplaint = await Complaint.findByIdAndUpdate(
+      complaintId,
+      { status: status }, // e.g., 'In Progress' or 'Resolved'
+      { new: true }
+    );
+
+    if (!updatedComplaint) return res.status(404).json({ message: "Complaint not found" });
+    
+    // Create notification for user when complaint status is updated
+    await Notification.create({
+      recipientId: updatedComplaint.userId,
+      title: 'Complaint Status Updated',
+      message: `Your complaint status updated to: ${status}`,
+      type: 'complaint_status'
+    });
+
+    res.status(200).json({ message: "Status updated successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating status" });
+  }
+});
+
+// --- NOTIFICATIONS ---
+
+// Get notifications for a user or admin
+app.get('/api/notifications/:userId', async (req, res) => {
+    try {
+        const notifications = await Notification.find({ recipientId: req.params.userId })
+            .sort({ createdAt: -1 })
+            .limit(20);
+        res.json(notifications);
+    } catch (err) {
+        res.status(500).send(err);
+    }
+});
+
+// Mark notifications as read
+app.post('/api/notifications/mark-read', async (req, res) => {
+    try {
+        await Notification.updateMany({ recipientId: req.body.userId, isRead: false }, { isRead: true });
+        res.sendStatus(200);
+    } catch (err) {
+        res.status(500).send(err);
+    }
+});
+
+// 5. Start Server
+const PORT = process.env.PORT || 5000; 
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT}`));, 'i') }).sort({ createdAt: -1 }).lean();
     res.status(200).json(complaints);
   } catch (err) {
     res.status(500).json({ message: "Error fetching worker tasks" });

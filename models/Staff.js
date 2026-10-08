@@ -8,7 +8,7 @@ const StaffSchema = new mongoose.Schema({
     role: {
         type: String,
         required: true,
-        enum: ['admin', 'Electricity', 'Plumbing', 'Carpenter', 'Dispensary', 'Miscellaneous']
+        enum: ['admin', 'Electricity', 'Plumbing', 'Carpenter', 'Dispensary', 'Miscellaneous', 'Technician']
     },
     createdAt: { type: Date, default: Date.now }
 });
